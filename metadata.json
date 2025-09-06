@@ -1,0 +1,5 @@
+
+{
+  "name": "AI Virtual Try-On",
+  "description": "Upload an image of yourself, select a clothing region (upper or lower), and describe a new clothing item to see how it looks on you. This app uses generative AI to edit your image."
+}
