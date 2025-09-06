@@ -199,13 +199,17 @@ const App: React.FC = () => {
       const generatedImgBase64 = await generateVirtualTryOn(imageFile, prompt, selectedRegions);
       setGeneratedImage(`data:image/png;base64,${generatedImgBase64}`);
       window.location.hash = "newGeneratedPhoto";
-    } catch (e) {
-      if (e instanceof ApiKeyError) {
+    } catch (err) {
+      const e = err?.error || false;
+      if (e) {
         setError(e.message);
         setIsApiKeyModalOpen(true);
-      } else {
-        const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
+      } else if(e.message) {
+        const errorMessage = e.message ? e.message : 'An unknown error occurred.';
         setError(errorMessage);
+      }else {
+        setError('An unknown error occurred. Please try again.');
+        setIsApiKeyModalOpen(true);
       }
     } finally {
       setIsLoading(false);
@@ -230,7 +234,42 @@ const App: React.FC = () => {
       {isApiKeyModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4" aria-modal="true" role="dialog">
           <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md">
-            <h2 className="text-xl font-bold text-gray-800">API Key Required</h2>
+              
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 max-w-lg mx-auto shadow-sm">
+              <h2 className="text-xl font-bold text-gray-800 mb-2">API Key Required</h2>
+              <h4 className="text-md font-semibold text-blue-700 flex items-center mb-2">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5 mr-2 text-blue-600"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-4a.75.75 0 01.75.75V10a.75.75 0 01-.75.75H8a.75.75 0 010-1.5h1.25V6.75A.75.75 0 0110 6z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                How to Get Your Gemini API Key
+              </h4>
+              <ol className="list-decimal list-inside text-sm text-gray-700 space-y-1">
+                <li>
+                  Go to{" "}
+                  <a
+                    href="https://aistudio.google.com/app/apikey"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 underline"
+                  >
+                    Google AI Studio
+                  </a>
+                </li>
+                <li>Sign in with your Google account.</li>
+                <li>Click <strong>“Create API Key”</strong>.</li>
+                <li>Copy the generated API Key and paste it into this app.</li>
+              </ol>
+
+            </div>
             <p className="text-sm text-gray-600 mt-2">
               {error || 'The Google Gemini API key is missing or invalid. Please provide a valid key to continue.'}
             </p>
