@@ -243,7 +243,7 @@ const App: React.FC = () => {
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder={"e.g., A vintage leather jacket"}
-                className="mt-2 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                className="mt-2 block w-full rounded-md  shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border-[#000000] p-4"
               />
               <div className="mt-3">
                 <label className="text-sm font-medium text-gray-600">Need inspiration?</label>
@@ -278,8 +278,9 @@ const App: React.FC = () => {
           {/* Image Display Column */}
           <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 flex flex-col">
             <header className="w-full max-w-[90%] mx-auto text-center mb-4 flex-shrink-0">
-              <h1 className="text-4xl sm:text-3xl font-bold text-gray-800 tracking-tight">AI Virtual Try-On</h1>
+              <h1 className="text-4xl sm:text-3xl font-bold text-gray-800 tracking-tight">AI Dress</h1>
               <p className="mt-2 text-md text-gray-600">See yourself in new outfits instantly. Upload your photo to begin.</p>
+              
             </header>
 
          
@@ -322,7 +323,11 @@ const App: React.FC = () => {
                       )}
                   </div>
               </div>
+             
           </div>
+           <div className="w-full max-w-[90%] mx-auto text-center mt-4 flex-shrink-0">
+                <p className="text-md text-purple-600">Design & Developed By: <a className="text-blue-600" href="https://razib.vercel.app/" target="_blank">Razib Hossain</a> </p>
+              </div>
            </div>
         </main>
       </div>
