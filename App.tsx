@@ -274,6 +274,8 @@ const App: React.FC = () => {
                 onDragLeave={handleDragLeave}
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
+                onClick={() => document.getElementById('file-upload')?.click()}
+                style={{ cursor: 'pointer' }}
               >
                 <input type="file" id="file-upload" className="hidden" accept="image/*" onChange={onFileSelected} />
                 <UploadIcon className="mx-auto h-10 w-10 text-gray-400" />
