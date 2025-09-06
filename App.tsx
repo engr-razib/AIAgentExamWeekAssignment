@@ -311,11 +311,13 @@ const App: React.FC = () => {
               <textarea
                 id="prompt"
                 rows={2}
+                max={100}
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder={"e.g., A vintage leather jacket"}
                 className="mt-2 block w-full  rounded-md border-[#ccc] border-2 border-solid shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm  p-4"
               />
+              <label className="text-xs text-right font-normal text-gray-600">{prompt.length}/100</label>
               <div className="mt-3">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 items-center">
                   <label className="text-sm font-medium text-gray-600">Need inspiration?</label>
