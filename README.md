@@ -1,3 +1,6 @@
+
+<img src="./og-image.jpg" style="width: 100%; height:auto;" />
+
 # AI Dress
 
 A web application that allows you to virtually try on new clothing by uploading a photo and describing the outfit you want to see. 
