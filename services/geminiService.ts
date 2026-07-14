@@ -78,9 +78,9 @@ export const generateVirtualTryOn = async (
   try {
     const client = getAiClient();
     
-    // 2. Call the stable production-ready Gemini 2.5 Flash model
+    // 2. Call the current frontier production model: gemini-3.5-flash
     const response = await client.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.5-flash',
       // Pass the multimodal input sequence directly into the contents array
       contents: [
         {
