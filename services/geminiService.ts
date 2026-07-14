@@ -1,7 +1,7 @@
 import { GoogleGenAI, Modality } from "@google/genai";
 import { Region } from '../types';
 
-// Custom Error for API Key issues
+// Custom Error class to handle missing or invalid API Key issues explicitly
 export class ApiKeyError extends Error {
   constructor(message: string) {
     super(message);
@@ -9,14 +9,20 @@ export class ApiKeyError extends Error {
   }
 }
 
+// Global state for the SDK client instance and current API Key
 let ai: GoogleGenAI | null = null;
 let currentApiKey: string | undefined = process.env.API_KEY;
 
-const getAiClient = () => {
+/**
+ * Lazy-initializes and returns the GoogleGenAI client.
+ * Throws an ApiKeyError if no key is currently set.
+ */
+const getAiClient = (): GoogleGenAI => {
   if (!currentApiKey) {
     throw new ApiKeyError('Google Gemini API key is not set. Please provide one.');
   }
-  // Re-initialize if the key has changed or it's the first time.
+  
+  // Initialize the client only if it hasn't been instantiated yet
   if (!ai) {
      ai = new GoogleGenAI({ apiKey: currentApiKey });
   }
@@ -24,41 +30,45 @@ const getAiClient = () => {
 }
 
 /**
- * Updates the API key and re-initializes the Gemini client instance.
- * @param newKey The new API key to use.
+ * Updates the active API key and forces a re-initialization of the Gemini client.
+ * @param newKey The new API key string provided by the user or application.
  */
-export const setApiKey = (newKey: string) => {
+export const setApiKey = (newKey: string): void => {
   currentApiKey = newKey;
-  ai = new GoogleGenAI({ apiKey: currentApiKey }); // Create a new instance with the new key
+  ai = new GoogleGenAI({ apiKey: currentApiKey }); 
 }
 
-
 /**
- * Converts a File object to a base64 encoded string.
- * @param file The file to convert.
- * @returns A promise that resolves with the base64 string.
+ * Helper utility to convert a browser File object into a base64 encoded string.
+ * @param file The image file to convert.
+ * @returns A promise that resolves with the clean base64 data payload string.
  */
 const fileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
-    reader.onload = () => resolve((reader.result as string).split(',')[1]);
+    reader.onload = () => {
+      const result = reader.result as string;
+      // Extract the raw base64 data by splitting off the data URL scheme prefix
+      resolve(result.split(',')[1]);
+    };
     reader.onerror = (error) => reject(error);
   });
 };
 
 /**
- * Calls the Gemini API to edit an image based on a prompt.
- * @param imageFile The user's uploaded image file.
- * @param prompt The text prompt describing the desired clothing.
- * @param regions The clothing regions to modify.
- * @returns A promise that resolves with the base64 string of the generated image.
+ * Calls the Gemini API to perform an image-to-image virtual try-on edit.
+ * @param imageFile The user's uploaded portrait image file.
+ * @param prompt The descriptive text prompt specifying the new clothing style/color.
+ * @param regions The body zones or apparel areas targetted for replacement.
+ * @returns A promise that resolves to the generated image's base64 string.
  */
 export const generateVirtualTryOn = async (
   imageFile: File,
   prompt: string,
   regions: Region[]
 ): Promise<string> => {
+  // 1. Prepare asset payload and construct the smart contextual prompt
   const base64ImageData = await fileToBase64(imageFile);
   const mimeType = imageFile.type;
 
@@ -67,45 +77,53 @@ export const generateVirtualTryOn = async (
 
   try {
     const client = getAiClient();
+    
+    // 2. Call the stable production-ready Gemini 2.5 Flash model
     const response = await client.models.generateContent({
-      model: 'gemini-2.5-flash-image-preview',
-      contents: {
-        parts: [
-          {
-            inlineData: {
-              data: base64ImageData,
-              mimeType: mimeType,
-            },
+      model: 'gemini-2.5-flash',
+      // Pass the multimodal input sequence directly into the contents array
+      contents: [
+        {
+          inlineData: {
+            data: base64ImageData,
+            mimeType: mimeType,
           },
-          {
-            text: fullPrompt,
-          },
-        ],
-      },
+        },
+        {
+          text: fullPrompt,
+        },
+      ],
       config: {
-        responseModalities: [Modality.IMAGE, Modality.TEXT],
+        // Enforce the model to respond back visually using Modality configuration
+        responseModalities: [Modality.IMAGE],
       },
     });
 
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        return part.inlineData.data;
+    // 3. Process the response payload looking for inline image data
+    const parts = response.candidates?.[0]?.content?.parts || [];
+    for (const part of parts) {
+      if (part.inlineData && part.inlineData.data) {
+        return part.inlineData.data; // Successfully returns the base64 string of the altered image
       }
     }
 
+    // 4. Handle edge cases where fallback text was returned or generation failed safely
     const textResponse = response.text;
     if (textResponse) {
       throw new Error(`API returned text instead of an image: ${textResponse}`);
     }
 
-    throw new Error('No image was generated. The model may have refused the request.');
+    throw new Error('No image data was generated by the model. Check content safety or constraints.');
   } catch (error) {
     console.error('Error generating virtual try-on:', error);
+    
+    // Bubble up custom ApiKeyErrors directly
     if (error instanceof ApiKeyError) {
-      throw error; // Re-throw the custom error to be caught by the UI
+      throw error;
     }
+    
     if (error instanceof Error) {
-        // Check for specific error messages related to API key invalidity
+        // Catch network/auth status exceptions related to credential issues
         if (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID')) {
             throw new ApiKeyError('Your API key is invalid. Please enter a valid one.');
         }
