@@ -1,4 +1,4 @@
-import { GoogleGenAI, Modality } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { Region } from '../types';
 
 // Custom Error class to handle missing or invalid API Key issues explicitly
@@ -14,15 +14,12 @@ let ai: GoogleGenAI | null = null;
 let currentApiKey: string | undefined = process.env.API_KEY;
 
 /**
- * Lazy-initializes and returns the GoogleGenAI client.
- * Throws an ApiKeyError if no key is currently set.
+ * Lazy-initializes and returns the GoogleGenAI client instance.
  */
 const getAiClient = (): GoogleGenAI => {
   if (!currentApiKey) {
-    throw new ApiKeyError('Google Gemini API key is not set. Please provide one.');
+    throw new ApiKeyError('Google API key is not set. Please provide one.');
   }
-  
-  // Initialize the client only if it hasn't been instantiated yet
   if (!ai) {
      ai = new GoogleGenAI({ apiKey: currentApiKey });
   }
@@ -30,8 +27,7 @@ const getAiClient = (): GoogleGenAI => {
 }
 
 /**
- * Updates the active API key and forces a re-initialization of the Gemini client.
- * @param newKey The new API key string provided by the user or application.
+ * Updates the active API key and forces a re-initialization of the client.
  */
 export const setApiKey = (newKey: string): void => {
   currentApiKey = newKey;
@@ -40,8 +36,6 @@ export const setApiKey = (newKey: string): void => {
 
 /**
  * Helper utility to convert a browser File object into a base64 encoded string.
- * @param file The image file to convert.
- * @returns A promise that resolves with the clean base64 data payload string.
  */
 const fileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -49,7 +43,6 @@ const fileToBase64 = (file: File): Promise<string> => {
     reader.readAsDataURL(file);
     reader.onload = () => {
       const result = reader.result as string;
-      // Extract the raw base64 data by splitting off the data URL scheme prefix
       resolve(result.split(',')[1]);
     };
     reader.onerror = (error) => reject(error);
@@ -57,10 +50,10 @@ const fileToBase64 = (file: File): Promise<string> => {
 };
 
 /**
- * Calls the Gemini API to perform an image-to-image virtual try-on edit.
+ * Calls the Google Imagen API to perform a photorealistic virtual try-on edit.
  * @param imageFile The user's uploaded portrait image file.
  * @param prompt The descriptive text prompt specifying the new clothing style/color.
- * @param regions The body zones or apparel areas targetted for replacement.
+ * @param regions The body zones targetted for replacement (e.g., ['upper body', 'torso']).
  * @returns A promise that resolves to the generated image's base64 string.
  */
 export const generateVirtualTryOn = async (
@@ -68,67 +61,52 @@ export const generateVirtualTryOn = async (
   prompt: string,
   regions: Region[]
 ): Promise<string> => {
-  // 1. Prepare asset payload and construct the smart contextual prompt
   const base64ImageData = await fileToBase64(imageFile);
   const mimeType = imageFile.type;
 
-  const regionText = regions.join(' and ') + (regions.length > 1 ? ' body regions' : ' body region');
-  const fullPrompt = `In the provided image, replace the clothing in the ${regionText} with a photorealistic "${prompt}". Maintain the person's pose, body shape, and the original background. The new clothing should blend seamlessly with the existing image.`;
+  // Formatting the region string for the editing model to detect the clothing area accurately
+  const regionText = regions.join(' and ');
+  const editingPrompt = `In the provided image, replace the clothing on the ${regionText} with a photorealistic, highly detailed "${prompt}". Keep the person's face, body structure, pose, and background exactly the same.`;
 
   try {
     const client = getAiClient();
     
-    // 2. Call the current frontier production model: gemini-3.5-flash
-    const response = await client.models.generateContent({
-      model: 'gemini-3.5-flash',
-      // Pass the multimodal input sequence directly into the contents array
-      contents: [
-        {
-          inlineData: {
-            data: base64ImageData,
-            mimeType: mimeType,
-          },
-        },
-        {
-          text: fullPrompt,
-        },
-      ],
+    // Using the dedicated Imagen 3 Editing model instead of Gemini Core
+    const response = await client.models.editImage({
+      model: 'imagen-3.0-editing-002',
+      image: {
+        data: base64ImageData,
+        mimeType: mimeType,
+      },
+      prompt: editingPrompt,
       config: {
-        // Enforce the model to respond back visually using Modality configuration
-        responseModalities: [Modality.IMAGE],
+        numberOfImages: 1,
+        outputMimeType: 'image/jpeg',
+        aspectRatio: '1:1', // Options: "1:1", "3:4", "4:3", "9:16", "16:9"
       },
     });
 
-    // 3. Process the response payload looking for inline image data
-    const parts = response.candidates?.[0]?.content?.parts || [];
-    for (const part of parts) {
-      if (part.inlineData && part.inlineData.data) {
-        return part.inlineData.data; // Successfully returns the base64 string of the altered image
-      }
+    // Process the generated image from the specific Imagen response payload structure
+    const generatedImage = response.generatedImages?.[0];
+    if (generatedImage && generatedImage.image && generatedImage.image.imageBytes) {
+      // Returns the base64 string of the newly edited try-on image
+      return generatedImage.image.imageBytes;
     }
 
-    // 4. Handle edge cases where fallback text was returned or generation failed safely
-    const textResponse = response.text;
-    if (textResponse) {
-      throw new Error(`API returned text instead of an image: ${textResponse}`);
-    }
-
-    throw new Error('No image data was generated by the model. Check content safety or constraints.');
+    throw new Error('Imagen API completed the request but did not return any image bytes.');
   } catch (error) {
-    console.error('Error generating virtual try-on:', error);
+    console.error('Error in virtual try-on image generation:', error);
     
-    // Bubble up custom ApiKeyErrors directly
     if (error instanceof ApiKeyError) {
       throw error;
     }
     
     if (error instanceof Error) {
-        // Catch network/auth status exceptions related to credential issues
         if (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID')) {
             throw new ApiKeyError('Your API key is invalid. Please enter a valid one.');
         }
-        throw new Error(`Failed to generate image: ${error.message}`);
+        throw new Error(`Virtual Try-On Failed: ${error.message}`);
     }
-    throw new Error('An unknown error occurred during image generation.');
+    throw new Error('An unknown error occurred during image editing.');
   }
 };
